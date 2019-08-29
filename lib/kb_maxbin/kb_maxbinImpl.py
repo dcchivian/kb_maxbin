@@ -22,9 +22,9 @@ class kb_maxbin:
     # state. A method could easily clobber the state set by another while
     # the latter method is running.
     ######################################### noqa
-    VERSION = "1.0.2"
+    VERSION = "1.1.0"
     GIT_URL = "https://github.com/kbaseapps/kb_maxbin.git"
-    GIT_COMMIT_HASH = "a8bb5ae6ea0dc5c2b951085106aaff62d7dd59c8"
+    GIT_COMMIT_HASH = "ceb65382172d525f3a47d46d2f25edaefb6b5e68"
 
     #BEGIN_CLASS_HEADER
     #END_CLASS_HEADER
@@ -76,11 +76,11 @@ class kb_maxbin:
         # ctx is the context object
         # return variables are: returnVal
         #BEGIN run_max_bin
-        print '--->\nRunning kb_maxbin.run_max_bin\nparams:'
-        print json.dumps(params, indent=1)
+        print('--->\nRunning kb_maxbin.run_max_bin\nparams:')
+        print(json.dumps(params, indent=1))
 
-        for key, value in params.iteritems():
-            if isinstance(value, basestring):
+        for key, value in params.items():
+            if isinstance(value, str):
                 params[key] = value.strip()
 
         maxbin_runner = MaxBinUtil(self.config)

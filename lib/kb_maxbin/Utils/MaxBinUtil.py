@@ -1,19 +1,19 @@
-
-import time
+import errno
 import json
 import os
-import uuid
-import errno
 import subprocess
-import shutil
 import sys
+import time
+import uuid
 import zipfile
 
-from DataFileUtil.DataFileUtilClient import DataFileUtil
-from KBaseReport.KBaseReportClient import KBaseReport
-from ReadsUtils.ReadsUtilsClient import ReadsUtils
-from AssemblyUtil.AssemblyUtilClient import AssemblyUtil
-from MetagenomeUtils.MetagenomeUtilsClient import MetagenomeUtils
+from Bio import SeqIO
+
+from installed_clients.AssemblyUtilClient import AssemblyUtil
+from installed_clients.DataFileUtilClient import DataFileUtil
+from installed_clients.KBaseReportClient import KBaseReport
+from installed_clients.MetagenomeUtilsClient import MetagenomeUtils
+from installed_clients.ReadsUtilsClient import ReadsUtils
 
 
 def log(message, prefix_newline=False):
@@ -83,7 +83,8 @@ class MaxBinUtil:
 
         result_file_path = []
 
-        reads = self.ru.download_reads({'read_libraries': reads_list, 'interleaved': 'true'})['files']
+        reads = self.ru.download_reads({'read_libraries': reads_list,
+                                        'interleaved': 'true'})['files']
 
         for read_obj in reads_list:
             files = reads[read_obj]['files']
@@ -194,35 +195,35 @@ class MaxBinUtil:
         output_directory = os.path.join(self.scratch, str(uuid.uuid4()))
         self._mkdir_p(output_directory)
         result_file_path = os.path.join(output_directory, 'report.html')
-        file_list = os.listdir(result_directory)
-
-        Summary_Table_Content = ''
-        if header + '.summary' in file_list:
-            with open(os.path.join(result_directory, header + '.summary'), 'r') as summary_file:
-                lines = summary_file.readlines()
-                first_line = True
-                for line in lines:
-                    Summary_Table_Content += '<tr>'
-                    for item in line.split('\t'):
-                        if first_line:
-                            Summary_Table_Content += '<th>{}</th>'.format(item)
-                        else:
-                            Summary_Table_Content += '<td>{}</td>'.format(item)
-                    first_line = False
-                    Summary_Table_Content += '</tr>'
 
         Overview_Content = ''
-        (binned_contig_count, input_contig_count,
-         too_short_count, no_class_count,
-         total_bins_count) = self._generate_overview_info(assembly_ref,
-                                                          binned_contig_obj_ref,
-                                                          result_directory)
 
-        Overview_Content += '<p>Binned contigs: {}</p>'.format(binned_contig_count)
-        Overview_Content += '<p>Input contigs: {}</p>'.format(input_contig_count)
-        Overview_Content += '<p>Contigs too short: {}</p>'.format(too_short_count)
-        Overview_Content += '<p>Contigs not in bins: {}</p>'.format(no_class_count)
-        Overview_Content += '<p>Total size of bins: {}</p>'.format(total_bins_count)
+        (binned_contig_count, input_contig_count,
+         too_short_count, total_bins_count, total_binned_contig_len,
+         totoal_contig_length, total_short_contig_len) = self._generate_overview_info(
+                                                            assembly_ref,
+                                                            binned_contig_obj_ref,
+                                                            result_directory)
+        Overview_Content += '<p>Bins: {}</p>'.format(total_bins_count)
+        Overview_Content += '<p>Input Contigs: {}</p>'.format(input_contig_count)
+        Overview_Content += '<p>Binned Contigs: {} ({:.1%})</p>'.format(
+                                            binned_contig_count,
+                                            binned_contig_count/float(input_contig_count))
+        Overview_Content += '<p>Unbinned Contigs: {} ({:.1%})</p>'.format(
+                                            input_contig_count - binned_contig_count,
+                                            1 - binned_contig_count/float(input_contig_count))
+        Overview_Content += '<p>Contigs Too Short: {} ({:.1%})</p>'.format(
+                                            too_short_count,
+                                            too_short_count/float(input_contig_count))
+        Overview_Content += '<p>Summed Length of Binned Contigs: {} ({:.1%})</p>'.format(
+                                            total_binned_contig_len,
+                                            total_binned_contig_len/float(totoal_contig_length))
+        Overview_Content += '<p>Summed Length of Unbinned Contigs: {} ({:.1%})</p>'.format(
+                                            totoal_contig_length - total_binned_contig_len,
+                                            1 - total_binned_contig_len/float(totoal_contig_length))
+        Overview_Content += '<p>Summed Length of Short Contigs: {} ({:.1%})</p>'.format(
+                                            total_short_contig_len,
+                                            total_short_contig_len/float(totoal_contig_length))
 
         with open(result_file_path, 'w') as result_file:
             with open(os.path.join(os.path.dirname(__file__), 'report_template.html'),
@@ -230,8 +231,6 @@ class MaxBinUtil:
                 report_template = report_template_file.read()
                 report_template = report_template.replace('<p>Overview_Content</p>',
                                                           Overview_Content)
-                report_template = report_template.replace('Summary_Table_Content',
-                                                          Summary_Table_Content)
                 result_file.write(report_template)
 
         html_report.append({'path': result_file_path,
@@ -250,30 +249,29 @@ class MaxBinUtil:
 
         input_contig_count = assembly.get('data').get('num_contigs')
 
+        totoal_contig_length = 0
+        for contig_id, contig in assembly.get('data').get('contigs').items():
+            totoal_contig_length += int(contig.get('length'))
+
         binned_contig_count = 0
         total_bins = binned_contig.get('data').get('bins')
+        total_binned_contig_len = binned_contig.get('data').get('total_contig_len')
         total_bins_count = len(total_bins)
         for bin in total_bins:
             binned_contig_count += len(bin.get('contigs'))
 
-        no_class_count = 0
         too_short_count = 0
+        total_short_contig_len = 0
         result_files = os.listdir(result_directory)
         for file_name in result_files:
-            if file_name.endswith('.noclass'):
-                with open(os.path.join(result_directory, file_name)) as file:
-                    for line in file:
-                        if line.startswith('>'):
-                            no_class_count += 1
-
             if file_name.endswith('.tooshort'):
-                with open(os.path.join(result_directory, file_name)) as file:
-                    for line in file:
-                        if line.startswith('>'):
-                            too_short_count += 1
+                for record in SeqIO.parse(os.path.join(result_directory, file_name), "fasta"):
+                    total_short_contig_len += len(str(record.seq))
+                    too_short_count += 1
 
         return (binned_contig_count, input_contig_count,
-                too_short_count, no_class_count, total_bins_count)
+                too_short_count, total_bins_count, total_binned_contig_len,
+                totoal_contig_length, total_short_contig_len)
 
     def _generate_report(self, binned_contig_obj_ref, result_directory, params):
         """
@@ -289,9 +287,14 @@ class MaxBinUtil:
                                                        binned_contig_obj_ref,
                                                        params.get('out_header'))
 
+        created_objects = []
+        created_objects.append({"ref": binned_contig_obj_ref,
+                                "description": "BinnedContigs from MaxBin2"})
+
         report_params = {
               'message': '',
               'workspace_name': params.get('workspace_name'),
+              'objects_created': created_objects,
               'file_links': output_files,
               'html_links': output_html_files,
               'direct_html_link_index': 0,
@@ -340,7 +343,6 @@ class MaxBinUtil:
             'params:\n{}'.format(json.dumps(params, indent=1)))
 
         self._validate_run_maxbin_params(params)
-        #params['out_header'] = params.get('binned_contig_name')
         params['out_header'] = 'Bin'
 
         contig_file = self._get_contig_file(params.get('assembly_ref'))
@@ -349,26 +351,17 @@ class MaxBinUtil:
         reads_list_file = self._stage_reads_list_file(params.get('reads_list'))
         params['reads_list_file'] = reads_list_file
 
-        command = self._generate_command(params)
-
-        existing_files = []
-        for subdir, dirs, files in os.walk('./'):
-            for file in files:
-                existing_files.append(file)
-
-        self._run_command(command)
-
-        new_files = []
-        for subdir, dirs, files in os.walk('./'):
-            for file in files:
-                if file not in existing_files:
-                    new_files.append(file)
-
         result_directory = os.path.join(self.scratch, str(uuid.uuid4()))
         self._mkdir_p(result_directory)
 
-        for file in new_files:
-            shutil.copy(file, result_directory)
+        command = self._generate_command(params)
+
+        cwd = os.getcwd()
+        log('changing working dir to {}'.format(result_directory))
+        os.chdir(result_directory)
+        self._run_command(command)
+        os.chdir(cwd)
+        log('changing working dir to {}'.format(cwd))
 
         log('Saved result files to: {}'.format(result_directory))
         log('Generated files:\n{}'.format('\n'.join(os.listdir(result_directory))))

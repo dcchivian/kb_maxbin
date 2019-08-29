@@ -1,27 +1,20 @@
 # -*- coding: utf-8 -*-
-import unittest
 import os  # noqa: F401
-import json  # noqa: F401
-import time
 import shutil
+import time
+import unittest
 import zipfile
-
+from configparser import ConfigParser  # py3
 from os import environ
-try:
-    from ConfigParser import ConfigParser  # py2
-except:
-    from configparser import ConfigParser  # py3
 
-from pprint import pprint  # noqa: F401
-
-from biokbase.workspace.client import Workspace as workspaceService
+from installed_clients.AssemblyUtilClient import AssemblyUtil
+from installed_clients.DataFileUtilClient import DataFileUtil
+from installed_clients.ReadsUtilsClient import ReadsUtils
+from installed_clients.WorkspaceClient import Workspace as workspaceService
+from kb_maxbin.Utils.MaxBinUtil import MaxBinUtil
+from kb_maxbin.authclient import KBaseAuth as _KBaseAuth
 from kb_maxbin.kb_maxbinImpl import kb_maxbin
 from kb_maxbin.kb_maxbinServer import MethodContext
-from kb_maxbin.authclient import KBaseAuth as _KBaseAuth
-from kb_maxbin.Utils.MaxBinUtil import MaxBinUtil
-from DataFileUtil.DataFileUtilClient import DataFileUtil
-from ReadsUtils.ReadsUtilsClient import ReadsUtils
-from AssemblyUtil.AssemblyUtilClient import AssemblyUtil
 
 
 class kb_maxbinTest(unittest.TestCase):
@@ -86,16 +79,17 @@ class kb_maxbinTest(unittest.TestCase):
 
         # KBaseAssembly.SingleEndLibrary for testing back compatibility
         se_reads_obj = cls.dfu.get_objects({'object_refs': [cls.se_reads_ref]})['data'][0]['data']
-        KBA_se_reads_obj_data = { 'handle': se_reads_obj['lib']['file'] }
-        KBA_se_reads_obj_info = cls.dfu.save_objects (
+        KBA_se_reads_obj_data = {'handle': se_reads_obj['lib']['file']}
+        KBA_se_reads_obj_info = cls.dfu.save_objects(
             {'id': cls.ws_info[0],
              'objects': [{'type': 'KBaseAssembly.SingleEndLibrary',
                           'data': KBA_se_reads_obj_data,
                           'name': 'test.KBA_single_reads',
                           'meta': {},
-                          'provenance':[{'service':'kb_maxbin', 'method': 'test_kb_maxbin'}]
-                      }]})[0]
-        [OBJID_I, NAME_I, TYPE_I, SAVE_DATE_I, VERSION_I, SAVED_BY_I, WSID_I, WORKSPACE_I, CHSUM_I, SIZE_I, META_I] = range(11)  # object_info tuple
+                          'provenance': [{'service': 'kb_maxbin', 'method': 'test_kb_maxbin'}]
+                          }]})[0]
+        [OBJID_I, NAME_I, TYPE_I, SAVE_DATE_I, VERSION_I, SAVED_BY_I, WSID_I, WORKSPACE_I,
+         CHSUM_I, SIZE_I, META_I] = list(range(11))  # object_info tuple
         cls.KBA_se_reads_ref = str(KBA_se_reads_obj_info[WSID_I]) + '/' \
                                + str(KBA_se_reads_obj_info[OBJID_I]) + '/' \
                                + str(KBA_se_reads_obj_info[VERSION_I])
@@ -119,23 +113,23 @@ class kb_maxbinTest(unittest.TestCase):
 
         # KBaseAssembly.PairedEndLibrary for testing back compatibility
         pe_reads_obj = cls.dfu.get_objects({'object_refs': [cls.pe_reads_ref]})['data'][0]['data']
-        KBA_pe_reads_obj_data = { 'handle_1': pe_reads_obj['lib1']['file'],
-                                  'insert_size_mean': pe_reads_obj['insert_size_mean'],
-                                  'insert_size_std_dev': pe_reads_obj['insert_size_std_dev'],
-                                  'interleaved': pe_reads_obj['interleaved'],
-                                  'read_orientation_outward': pe_reads_obj['read_orientation_outward']
-        }
+        KBA_pe_reads_obj_data = {'handle_1': pe_reads_obj['lib1']['file'],
+                                 'insert_size_mean': pe_reads_obj['insert_size_mean'],
+                                 'insert_size_std_dev': pe_reads_obj['insert_size_std_dev'],
+                                 'interleaved': pe_reads_obj['interleaved'],
+                                 'read_orientation_outward': pe_reads_obj['read_orientation_outward']}
         if 'lib2' in pe_reads_obj:
             KBA_pe_reads_obj_data['handle_2'] = pe_reads_obj['lib2']['file']
-        KBA_pe_reads_obj_info = cls.dfu.save_objects (
+        KBA_pe_reads_obj_info = cls.dfu.save_objects(
             {'id': cls.ws_info[0],
              'objects': [{'type': 'KBaseAssembly.PairedEndLibrary',
                           'data': KBA_pe_reads_obj_data,
                           'name': 'test.KBA_paired_reads',
                           'meta': {},
-                          'provenance':[{'service':'kb_maxbin', 'method': 'test_kb_maxbin'}]
-                      }]})[0]
-        [OBJID_I, NAME_I, TYPE_I, SAVE_DATE_I, VERSION_I, SAVED_BY_I, WSID_I, WORKSPACE_I, CHSUM_I, SIZE_I, META_I] = range(11)  # object_info tuple
+                          'provenance': [{'service': 'kb_maxbin', 'method': 'test_kb_maxbin'}]
+                          }]})[0]
+        [OBJID_I, NAME_I, TYPE_I, SAVE_DATE_I, VERSION_I, SAVED_BY_I, WSID_I, WORKSPACE_I,
+         CHSUM_I, SIZE_I, META_I] = list(range(11))  # object_info tuple
         cls.KBA_pe_reads_ref = str(KBA_pe_reads_obj_info[WSID_I]) + '/' \
                                + str(KBA_pe_reads_obj_info[OBJID_I]) + '/' \
                                + str(KBA_pe_reads_obj_info[VERSION_I])
@@ -171,7 +165,7 @@ class kb_maxbinTest(unittest.TestCase):
           'workspace_name': 'workspace_name',
           'reads_list': 'reads_list'
         }
-        with self.assertRaisesRegexp(
+        with self.assertRaisesRegex(
                     ValueError, '"assembly_ref" parameter is required, but missing'):
             self.getImpl().run_max_bin(self.getContext(), invalidate_input_params)
 
@@ -181,7 +175,7 @@ class kb_maxbinTest(unittest.TestCase):
           'workspace_name': 'workspace_name',
           'reads_list': 'reads_list'
         }
-        with self.assertRaisesRegexp(
+        with self.assertRaisesRegex(
                     ValueError, '"binned_contig_name" parameter is required, but missing'):
             self.getImpl().run_max_bin(self.getContext(), invalidate_input_params)
 
@@ -191,7 +185,7 @@ class kb_maxbinTest(unittest.TestCase):
           'missing_workspace_name': 'workspace_name',
           'reads_list': 'reads_list'
         }
-        with self.assertRaisesRegexp(
+        with self.assertRaisesRegex(
                     ValueError, '"workspace_name" parameter is required, but missing'):
             self.getImpl().run_max_bin(self.getContext(), invalidate_input_params)
 
@@ -201,7 +195,7 @@ class kb_maxbinTest(unittest.TestCase):
           'workspace_name': 'workspace_name',
           'missing_reads_list': 'reads_list'
         }
-        with self.assertRaisesRegexp(
+        with self.assertRaisesRegex(
                     ValueError, '"reads_list" parameter is required, but missing'):
             self.getImpl().run_max_bin(self.getContext(), invalidate_input_params)
 
@@ -216,7 +210,7 @@ class kb_maxbinTest(unittest.TestCase):
 
         contig_file_path = self.maxbin_runner._stage_file(contig_file)
 
-        self.assertEquals(contig_filename.rpartition('.')[0], os.path.basename(contig_file_path))
+        self.assertEqual(contig_filename.rpartition('.')[0], os.path.basename(contig_file_path))
 
         # test shock id
         contig_shock_id = self.dfu.file_to_shock({'file_path': contig_path})['shock_id']
@@ -224,7 +218,7 @@ class kb_maxbinTest(unittest.TestCase):
 
         contig_file_path = self.maxbin_runner._stage_file(contig_file)
 
-        self.assertEquals(contig_filename.rpartition('.')[0], os.path.basename(contig_file_path))
+        self.assertEqual(contig_filename.rpartition('.')[0], os.path.basename(contig_file_path))
 
     def test_MaxBinUtil_generate_command(self):
         input_params = {
@@ -236,7 +230,7 @@ class kb_maxbinTest(unittest.TestCase):
         expect_command = '/kb/deployment/bin/MaxBin/run_MaxBin.pl '
         expect_command += '-contig mycontig -out myout -abund_list abund_list_file '
         command = self.maxbin_runner._generate_command(input_params)
-        self.assertEquals(command, expect_command)
+        self.assertEqual(command, expect_command)
 
         input_params = {
             'contig_file_path': 'mycontig',
@@ -247,7 +241,7 @@ class kb_maxbinTest(unittest.TestCase):
         expect_command = '/kb/deployment/bin/MaxBin/run_MaxBin.pl '
         expect_command += '-contig mycontig -out myout -reads_list reads_list_file '
         command = self.maxbin_runner._generate_command(input_params)
-        self.assertEquals(command, expect_command)
+        self.assertEqual(command, expect_command)
 
         input_params = {
             'contig_file_path': 'mycontig',
@@ -260,7 +254,7 @@ class kb_maxbinTest(unittest.TestCase):
         expect_command += '-contig mycontig -out myout '
         expect_command += '-abund_list abund_list_file -reads_list reads_list_file '
         command = self.maxbin_runner._generate_command(input_params)
-        self.assertEquals(command, expect_command)
+        self.assertEqual(command, expect_command)
 
         input_params = {
             'contig_file_path': 'mycontig',
@@ -281,7 +275,7 @@ class kb_maxbinTest(unittest.TestCase):
         expect_command += '-thread 4 -prob_threshold 0.5 -markerset 40 '
         expect_command += '-min_contig_length 600 -plotmarker -reassembly '
         command = self.maxbin_runner._generate_command(input_params)
-        self.assertEquals(command, expect_command)
+        self.assertEqual(command, expect_command)
 
     def test_MaxBinUtil_generate_output_file_list(self):
 
@@ -298,23 +292,17 @@ class kb_maxbinTest(unittest.TestCase):
 
         self.assertTrue('path' in output_file)
         output_file_path = output_file.get('path')
-        expect_file_set = set(['out_header.abund1',
-                               'out_header.abund2',
-                               'out_header.abund3',
-                               'out_header.marker',
-                               'out_header.marker_of_each_bin.tar.gz',
-                               'out_header.summary',
-                               'out_header.noclass',
-                               'out_header.log',
-                               'out_header.abundance',
-                               'out_header.tooshort'])
+        expect_file_set = {'out_header.abund1', 'out_header.abund2', 'out_header.abund3',
+                           'out_header.marker', 'out_header.marker_of_each_bin.tar.gz',
+                           'out_header.summary', 'out_header.noclass', 'out_header.log',
+                           'out_header.abundance', 'out_header.tooshort'}
 
         with zipfile.ZipFile(output_file_path) as z:
             self.assertEqual(set(z.namelist()), expect_file_set)
 
-        self.assertEquals(output_file.get('description'), 'File(s) generated by MaxBin2 App')
-        self.assertEquals(output_file.get('name'), 'maxbin_result.zip')
-        self.assertEquals(output_file.get('label'), 'maxbin_result.zip')
+        self.assertEqual(output_file.get('description'), 'File(s) generated by MaxBin2 App')
+        self.assertEqual(output_file.get('name'), 'maxbin_result.zip')
+        self.assertEqual(output_file.get('label'), 'maxbin_result.zip')
 
     def test_MaxBinUtil_stage_reads_list_file(self):
         # test SingleEndLibrary
@@ -325,9 +313,9 @@ class kb_maxbinTest(unittest.TestCase):
         with open(reads_list_file) as file:
             result_file_list = file.readlines()
 
-        self.assertEquals(len(result_file_list), len(reads_list))
+        self.assertEqual(len(result_file_list), len(reads_list))
         for item in result_file_list:
-            self.assertRegexpMatches(item, r'.*\.single\.fastq.*')
+            self.assertRegex(item, r'.*\.single\.fastq.*')
 
         # test KBaseAssembly SingleEndLibrary
         reads_list = [self.KBA_se_reads_ref, self.KBA_se_reads_ref]
@@ -337,9 +325,9 @@ class kb_maxbinTest(unittest.TestCase):
         with open(reads_list_file) as file:
             result_file_list = file.readlines()
 
-        self.assertEquals(len(result_file_list), len(reads_list))
+        self.assertEqual(len(result_file_list), len(reads_list))
         for item in result_file_list:
-            self.assertRegexpMatches(item, r'.*\.single\.fastq.*')
+            self.assertRegex(item, r'.*\.single\.fastq.*')
 
         # test PairedEndLibrary
         reads_list = [self.pe_reads_ref, self.pe_reads_ref]
@@ -349,9 +337,9 @@ class kb_maxbinTest(unittest.TestCase):
         with open(reads_list_file) as file:
             result_file_list = file.readlines()
 
-        self.assertEquals(len(result_file_list), len(reads_list))
+        self.assertEqual(len(result_file_list), len(reads_list))
         for item in result_file_list:
-            self.assertRegexpMatches(item, r'.*\.inter\.fastq.*')
+            self.assertRegex(item, r'.*\.inter\.fastq.*')
 
         # test KBaseAssembly PairedEndLibrary
         reads_list = [self.KBA_pe_reads_ref, self.KBA_pe_reads_ref]
@@ -361,9 +349,9 @@ class kb_maxbinTest(unittest.TestCase):
         with open(reads_list_file) as file:
             result_file_list = file.readlines()
 
-        self.assertEquals(len(result_file_list), len(reads_list))
+        self.assertEqual(len(result_file_list), len(reads_list))
         for item in result_file_list:
-            self.assertRegexpMatches(item, r'.*\.inter\.fastq.*')
+            self.assertRegex(item, r'.*\.inter\.fastq.*')
 
     def test_MaxBinUtil_get_contig_file(self):
         contig_file = self.maxbin_runner._get_contig_file(self.assembly_ref)
@@ -374,7 +362,7 @@ class kb_maxbinTest(unittest.TestCase):
         with open(self.assembly_fasta_file_path, 'r') as file:
             expect_contig_file_content = file.readlines()
 
-        self.assertItemsEqual(contig_file_content, expect_contig_file_content)
+        self.assertCountEqual(contig_file_content, expect_contig_file_content)
 
     def test_run_maxbin_single_reads(self):
 
