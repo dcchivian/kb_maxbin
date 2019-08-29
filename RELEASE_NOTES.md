@@ -1,6 +1,3 @@
-### Version 1.0.3
-- changed contact from email to url
-
 ### Version 1.0.2
 - Added KBaseAssembly.SingleEndFile and KBaseAssembly.PairedEndFile as viable input types to allow for backwards compatibility with old KBase read data objects
 
